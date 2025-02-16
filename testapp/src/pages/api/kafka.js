@@ -1,12 +1,26 @@
 import { Kafka } from "kafkajs";
 
 export default async function handler(req, res) {
-    const { action, message, brokers } = req.body;
+    const { action, message, brokers, authType, username, password } = req.body;
     if (!brokers) {
         return res.status(400).json({ success: false, error: "Kafka brokers are required" });
     }
 
-    const kafka = new Kafka({ clientId: "testapp", brokers: brokers.split(",") });
+    const kafkaConfig = {
+        clientId: "testapp",
+        brokers: brokers.split(","),
+    };
+
+    if (authType === "sasl_plaintext") {
+        kafkaConfig.sasl = {
+            mechanism: "plain",
+            username: username,
+            password: password,
+        };
+        kafkaConfig.ssl = false; // Explicitly set for plaintext
+    }
+
+    const kafka = new Kafka(kafkaConfig);
 
     if (action === "send") {
         try {

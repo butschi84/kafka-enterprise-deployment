@@ -6,6 +6,8 @@ let consumer;
 let isConsumerConnected = false;
 
 export default function handler(req, res) {
+    console.log("🚀 API Route Hit: kafka-consumer.js");
+
     if (!res.socket.server.io) {
         console.log("✅ Initializing WebSocket server...");
         io = new Server(res.socket.server, {
@@ -16,32 +18,42 @@ export default function handler(req, res) {
                 allowedHeaders: ["Content-Type"],
                 credentials: true
             },
-            transports: ["websocket"], // Force WebSocket
+            transports: ["websocket"],
         });
 
         res.socket.server.io = io;
+        console.log("✅ WebSocket server initialized");
 
         io.on("connection", async (socket) => {
             console.log("🔗 Client connected via WebSocket");
 
-            socket.on("setBrokers", async (brokers) => {
-                console.log(`🔄 Reconnecting consumer with brokers: ${brokers}`);
+            socket.on("setBrokers", async ({ brokers, authType, username, password }) => {
+                console.log(`🔄 Reconnecting consumer with brokers: ${brokers}, Auth: ${authType}`);
 
                 try {
                     if (consumer && isConsumerConnected) {
                         await consumer.disconnect();
                     }
 
-                    const kafka = new Kafka({
+                    const kafkaConfig = {
                         clientId: `test-listener-${Date.now()}`,
                         brokers: brokers.split(","),
-                    });
+                    };
 
+                    if (authType === "sasl_plaintext") {
+                        kafkaConfig.sasl = {
+                            mechanism: "plain",
+                            username: username,
+                            password: password,
+                        };
+                        kafkaConfig.ssl = false; // Explicitly set for plaintext
+                    }
+
+                    const kafka = new Kafka(kafkaConfig);
                     consumer = kafka.consumer({ groupId: `test-group-${Date.now()}` });
 
-                    socket.emit("connectingConsumer", "🔗 Connecting Kafka Consumer");
                     await consumer.connect();
-                    await consumer.subscribe({ topic: "test-topic", fromBeginning: false });
+                    await consumer.subscribe({ topic: "test-topic", fromBeginning: true });
 
                     await consumer.run({
                         eachMessage: async ({ message }) => {
@@ -62,8 +74,8 @@ export default function handler(req, res) {
                 console.log("❌ Client disconnected");
             });
         });
-
-        console.log("✅ WebSocket server initialized");
+    } else {
+        console.log("⚠️ WebSocket server already initialized");
     }
 
     res.end();

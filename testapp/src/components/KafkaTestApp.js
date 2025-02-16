@@ -11,6 +11,10 @@ export default function KafkaTestApp() {
     const [logs, setLogs] = useState("");
     const [brokers, setBrokers] = useState("kafka:9092");
     const [socket, setSocket] = useState(null);
+    const [authType, setAuthType] = useState("none");
+    const [username, setUsername] = useState("");
+    const [password, setPassword] = useState("");
+    const [wsConnected, setWsConnected] = useState(false);
 
     const logMessage = (msg) => {
         setLogs((prev) => prev + msg + "\n");
@@ -21,12 +25,19 @@ export default function KafkaTestApp() {
             const response = await fetch("/api/kafka", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "send", message, brokers }),
+                body: JSON.stringify({ action: "send", message, brokers, authType, username, password }),
             });
             const data = await response.json();
             logMessage(data.success ? `📤 Sent: ${message}` : `❌ Error: ${data.error}`);
         } catch (error) {
             logMessage(`❌ Error sending: ${error.message}`);
+        }
+    };
+
+    const saveSettings = () => {
+        if (socket) {
+            socket.emit("setBrokers", { brokers, authType, username, password });
+            logMessage(`🔄 Updated settings: Brokers - ${brokers}, Auth - ${authType}`);
         }
     };
 
@@ -48,6 +59,11 @@ export default function KafkaTestApp() {
 
         logMessage(`📩 Initializing Web Socket`);
 
+        newSocket.on("connect", () => {
+            console.log("✅ WebSocket connected!");
+            setWsConnected(true);
+        });
+
         newSocket.on("newMessage", (msg) => {
             setReceivedMessages((prev) => [...prev, msg]);
             logMessage(`📩 Received: ${msg}`);
@@ -59,6 +75,11 @@ export default function KafkaTestApp() {
 
         newSocket.on("consumerError", (err) => {
             logMessage(`❌ Consumer error: ${err}`);
+        });
+
+        newSocket.on("disconnect", () => {
+            console.log("❌ WebSocket disconnected");
+            setWsConnected(false);
         });
 
         return () => {
@@ -124,7 +145,28 @@ export default function KafkaTestApp() {
                                 value={brokers}
                                 onChange={(e) => setBrokers(e.target.value)}
                             />
-                            <Button onClick={saveBrokers} className="btn btn-success">Save</Button>
+                            <select className="form-control" value={authType} onChange={(e) => setAuthType(e.target.value)}>
+                                <option value="none">None</option>
+                                <option value="sasl_plaintext">SASL/PLAIN</option>
+                            </select>
+                            {authType === "sasl_plaintext" && (
+                                <>
+                                    <Input
+                                        type="text"
+                                        placeholder="Username"
+                                        value={username}
+                                        onChange={(e) => setUsername(e.target.value)}
+                                    />
+                                    <Input
+                                        type="password"
+                                        placeholder="Password"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                    />
+                                </>
+                            )}
+                            <Button onClick={saveSettings} className="btn btn-success">Save</Button>
+                            <p className="text-muted">{wsConnected ? "✅ Connected" : "❌ Not Connected"}</p>
                         </CardContent>
                     </Card>
                 </div>
