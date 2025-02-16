@@ -1,0 +1,25 @@
+{
+  "name": "kafka-test-app",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "bootstrap": "^5.3.3",
+    "kafkajs": "^2.2.4",
+    "net": "^1.0.2",
+    "next": "^14.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "tls": "^0.0.1"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "devDependencies": {
+    "eslint": "^8.53.0",
+    "eslint-config-next": "^14.0.0"
+  }
+}
