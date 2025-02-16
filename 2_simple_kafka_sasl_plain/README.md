@@ -1,4 +1,5 @@
 # Simple Kafka Deployment with SASL Plaintext Authentication
+![](docs/2_simple_kafka_sasl_plain.png)
 
 A single-instance Kafka setup for local testing/development. Uses Zookeeper, Kafka, and Kafka UI.  
 * **No encryption**
