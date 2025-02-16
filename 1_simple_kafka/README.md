@@ -1,5 +1,7 @@
 # Simple Kafka Deployment
 
+![](docs/1_simple_kafka_deployment.png)
+
 A single-instance Kafka setup for local testing/development. Uses Zookeeper, Kafka, and Kafka UI.  
 **No encryption**, **no authentication**.
 
