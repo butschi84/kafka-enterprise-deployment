@@ -1,0 +1,196 @@
+version: '3.8'
+
+services:
+  zookeeper-1:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper-1
+    restart: always
+    environment:
+      ZOOKEEPER_SERVER_ID: 1
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_SERVERS: "zookeeper-1:2888:3888;zookeeper-2:2888:3888;zookeeper-3:2888:3888"
+    networks:
+      - kafka
+
+  zookeeper-2:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper-2
+    restart: always
+    environment:
+      ZOOKEEPER_SERVER_ID: 2
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_SERVERS: "zookeeper-1:2888:3888;zookeeper-2:2888:3888;zookeeper-3:2888:3888"
+    networks:
+      - kafka
+
+  zookeeper-3:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper-3
+    restart: always
+    environment:
+      ZOOKEEPER_SERVER_ID: 3
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_SERVERS: "zookeeper-1:2888:3888;zookeeper-2:2888:3888;zookeeper-3:2888:3888"
+    networks:
+      - kafka
+
+  kafka-1:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka-1
+    restart: always
+    depends_on:
+      - zookeeper-1
+      - zookeeper-2
+      - zookeeper-3
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 100
+      KAFKA_LISTENERS: SSL://0.0.0.0:19093
+      KAFKA_ADVERTISED_LISTENERS: SSL://kafka-1:19093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: SSL:SSL
+      KAFKA_SECURITY_INTER_BROKER_PROTOCOL: SSL
+      KAFKA_SSL_KEYSTORE_FILENAME: server.keystore.jks
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: credentials
+      KAFKA_SSL_KEY_CREDENTIALS: credentials
+      KAFKA_SSL_TRUSTSTORE_FILENAME: server.truststore.jks
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: credentials
+      KAFKA_SSL_CLIENT_AUTH: required
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: " "
+      KAFKA_AUTHORIZER_CLASS_NAME: kafka.security.authorizer.AclAuthorizer
+      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "false"
+      KAFKA_PRINCIPAL_BUILDER_CLASS: "org.apache.kafka.common.security.authenticator.DefaultKafkaPrincipalBuilder"
+      KAFKA_SSL_PRINCIPAL_MAPPING_RULES: "RULE:^CN=(.*?)$$/$$1/L"
+      KAFKA_SUPER_USERS: ${KAFKA_SUPER_USERS}
+      KAFKA_LOG4J_LOGGERS: "kafka.oauthbearer=DEBUG,kafka.authorizer.logger=DEBUG,kafka.controller=DEBUG,org.apache.kafka.authorizer=DEBUG"
+      KAFKA_LOG4J_ROOT_LOGLEVEL: "DEBUG"
+    ports:
+      - "19093:19093"
+    volumes:
+      - ./certs:/etc/kafka/secrets
+    networks:
+      - kafka
+
+  kafka-2:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka-2
+    restart: always
+    depends_on:
+      - zookeeper-1
+      - zookeeper-2
+      - zookeeper-3
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 100
+      KAFKA_LISTENERS: SSL://0.0.0.0:29093
+      KAFKA_ADVERTISED_LISTENERS: SSL://kafka-2:29093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: SSL:SSL
+      KAFKA_SECURITY_INTER_BROKER_PROTOCOL: SSL
+      KAFKA_SSL_KEYSTORE_FILENAME: server.keystore.jks
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: credentials
+      KAFKA_SSL_KEY_CREDENTIALS: credentials
+      KAFKA_SSL_TRUSTSTORE_FILENAME: server.truststore.jks
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: credentials
+      KAFKA_SSL_CLIENT_AUTH: required
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: " "
+      KAFKA_AUTHORIZER_CLASS_NAME: kafka.security.authorizer.AclAuthorizer
+      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "false"
+      KAFKA_PRINCIPAL_BUILDER_CLASS: "org.apache.kafka.common.security.authenticator.DefaultKafkaPrincipalBuilder"
+      KAFKA_SUPER_USERS: ${KAFKA_SUPER_USERS}
+      KAFKA_SSL_PRINCIPAL_MAPPING_RULES: "RULE:^CN=(.*?)$$/$$1/L"
+      KAFKA_LOG4J_LOGGERS: "kafka.oauthbearer=DEBUG,kafka.authorizer.logger=DEBUG,kafka.controller=DEBUG,org.apache.kafka.authorizer=DEBUG"
+      KAFKA_LOG4J_ROOT_LOGLEVEL: "INFO"
+    ports:
+      - "29093:29093"
+    volumes:
+      - ./certs:/etc/kafka/secrets
+    networks:
+      - kafka
+
+  kafka-3:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka-3
+    restart: always
+    depends_on:
+      - zookeeper-1
+      - zookeeper-2
+      - zookeeper-3
+    environment:
+      KAFKA_BROKER_ID: 3
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 100
+      KAFKA_LISTENERS: SSL://0.0.0.0:39093
+      KAFKA_ADVERTISED_LISTENERS: SSL://kafka-3:39093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: SSL:SSL
+      KAFKA_SECURITY_INTER_BROKER_PROTOCOL: SSL
+      KAFKA_SSL_KEYSTORE_FILENAME: server.keystore.jks
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: credentials
+      KAFKA_SSL_KEY_CREDENTIALS: credentials
+      KAFKA_SSL_TRUSTSTORE_FILENAME: server.truststore.jks
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: credentials
+      KAFKA_SSL_CLIENT_AUTH: required
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: " "
+      KAFKA_AUTHORIZER_CLASS_NAME: kafka.security.authorizer.AclAuthorizer
+      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "false"
+      KAFKA_PRINCIPAL_BUILDER_CLASS: "org.apache.kafka.common.security.authenticator.DefaultKafkaPrincipalBuilder"
+      KAFKA_SUPER_USERS: ${KAFKA_SUPER_USERS}
+      KAFKA_SSL_PRINCIPAL_MAPPING_RULES: "RULE:^CN=(.*?)$$/$$1/L"
+      KAFKA_LOG4J_LOGGERS: "kafka.oauthbearer=DEBUG,kafka.authorizer.logger=DEBUG,kafka.controller=DEBUG,org.apache.kafka.authorizer=DEBUG"
+      KAFKA_LOG4J_ROOT_LOGLEVEL: "INFO"
+    ports:
+      - "39093:39093"
+    volumes:
+      - ./certs:/etc/kafka/secrets
+    networks:
+      - kafka
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui
+    container_name: kafka-ui
+    restart: always
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+    ports:
+      - "8089:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-1:19093,kafka-2:29093,kafka-3:39093
+      KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL: SSL
+      KAFKA_CLUSTERS_0_PROPERTIES_SSL_TRUSTSTORE_LOCATION: /etc/kafka/certs/server.truststore.jks
+      KAFKA_CLUSTERS_0_PROPERTIES_SSL_TRUSTSTORE_PASSWORD: changeit
+      KAFKA_CLUSTERS_0_PROPERTIES_SSL_KEYSTORE_LOCATION: /etc/kafka/certs/kafka-ui.keystore.jks
+      KAFKA_CLUSTERS_0_PROPERTIES_SSL_KEYSTORE_PASSWORD: changeit
+      KAFKA_CLUSTERS_0_PROPERTIES_CLIENT_DNS_LOOKUP: use_all_dns_ips
+    volumes:
+      - ./certs:/etc/kafka/certs
+    networks:
+      - kafka
+
+networks:
+  kafka:
+    name: kafka
+    driver: bridge
