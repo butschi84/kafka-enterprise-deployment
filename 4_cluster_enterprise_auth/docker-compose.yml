@@ -1,0 +1,301 @@
+version: '3.8'
+
+services:
+  zookeeper-1:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper-1
+    restart: always
+    environment:
+      ZOOKEEPER_SERVER_ID: 1
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_SERVERS: "zookeeper-1:2888:3888;zookeeper-2:2888:3888;zookeeper-3:2888:3888"
+      KAFKA_OPTS: -Djava.security.auth.login.config=/etc/kafka/secrets/zookeeper_server_jaas.conf
+        -Dquorum.auth.enableSasl=true
+        -Dquorum.auth.learnerRequireSasl=true
+        -Dquorum.auth.serverRequireSasl=true
+        -Dquorum.cnxn.threads.size=20
+        -Dzookeeper.authProvider.1=org.apache.zookeeper.server.auth.SASLAuthenticationProvider
+        -Dzookeeper.authProvider.2=org.apache.zookeeper.server.auth.DigestAuthenticationProvider
+        -DjaasLoginRenew=3600000
+        -DrequireClientAuthScheme=sasl
+        -Dquorum.auth.learner.loginContext=QuorumLearner
+        -Dquorum.auth.server.loginContext=QuorumServer
+    networks:
+      - kafka
+    volumes:
+      - ./config/zookeeper_server_jaas.conf:/etc/kafka/secrets/zookeeper_server_jaas.conf
+
+  zookeeper-2:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper-2
+    restart: always
+    environment:
+      ZOOKEEPER_SERVER_ID: 2
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_SERVERS: "zookeeper-1:2888:3888;zookeeper-2:2888:3888;zookeeper-3:2888:3888"
+      KAFKA_OPTS: -Djava.security.auth.login.config=/etc/kafka/secrets/zookeeper_server_jaas.conf
+        -Dquorum.auth.enableSasl=true
+        -Dquorum.auth.learnerRequireSasl=true
+        -Dquorum.auth.serverRequireSasl=true
+        -Dquorum.cnxn.threads.size=20
+        -Dzookeeper.authProvider.1=org.apache.zookeeper.server.auth.SASLAuthenticationProvider
+        -Dzookeeper.authProvider.2=org.apache.zookeeper.server.auth.DigestAuthenticationProvider
+        -DjaasLoginRenew=3600000
+        -DrequireClientAuthScheme=sasl
+        -Dquorum.auth.learner.loginContext=QuorumLearner
+        -Dquorum.auth.server.loginContext=QuorumServer
+    networks:
+      - kafka
+    volumes:
+      - ./config/zookeeper_server_jaas.conf:/etc/kafka/secrets/zookeeper_server_jaas.conf
+
+  zookeeper-3:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper-3
+    restart: always
+    environment:
+      ZOOKEEPER_SERVER_ID: 3
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_SERVERS: "zookeeper-1:2888:3888;zookeeper-2:2888:3888;zookeeper-3:2888:3888"
+      KAFKA_OPTS: -Djava.security.auth.login.config=/etc/kafka/secrets/zookeeper_server_jaas.conf
+        -Dquorum.auth.enableSasl=true
+        -Dquorum.auth.learnerRequireSasl=true
+        -Dquorum.auth.serverRequireSasl=true
+        -Dquorum.cnxn.threads.size=20
+        -Dzookeeper.authProvider.1=org.apache.zookeeper.server.auth.SASLAuthenticationProvider
+        -Dzookeeper.authProvider.2=org.apache.zookeeper.server.auth.DigestAuthenticationProvider
+        -DjaasLoginRenew=3600000
+        -DrequireClientAuthScheme=sasl
+        -Dquorum.auth.learner.loginContext=QuorumLearner
+        -Dquorum.auth.server.loginContext=QuorumServer
+    networks:
+      - kafka
+    volumes:
+      - ./config/zookeeper_server_jaas.conf:/etc/kafka/secrets/zookeeper_server_jaas.conf
+
+  kafka-1:
+    image: eu.gcr.io/quickstart-1565428320969/kafka:latest
+    container_name: kafka-1
+    restart: always
+    depends_on:
+      - zookeeper-1
+      - zookeeper-2
+      - zookeeper-3
+    ports:
+     - 19092:19092
+    environment:
+      # Broker Identification and Core Settings
+      KAFKA_BROKER_ID: 1                                      # Unique identifier for this Kafka broker
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181"  # Zookeeper ensemble connection string
+      KAFKA_ZOOKEEPER_SASL_ENABLED: "true"                   # Enable SASL for Zookeeper connection
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"                # Automatically create topics if they don’t exist
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3              # Replication factor for offsets topic
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2                 # Minimum in-sync replicas for transaction state log
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3      # Replication factor for transaction state log
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 100            # Delay before initial consumer group rebalance
+
+      # Listener Configuration
+      KAFKA_LISTENERS: SASLSSL://0.0.0.0:19092,SSL://0.0.0.0:19093  # Define listener endpoints
+      KAFKA_ADVERTISED_LISTENERS: SASLSSL://kafka-1:19092,SSL://kafka-1:19093  # Advertised listener endpoints for clients
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: SASLSSL:SASL_SSL,SSL:SSL  # Mapping of listener names to security protocols
+      KAFKA_INTER_BROKER_LISTENER_NAME: SSL                  # Listener used for inter-broker communication
+
+      # SASL/SSL Listener Configuration (SASLSSL)
+      KAFKA_LISTENER_NAME_SASLSSL_SASL_ENABLED_MECHANISMS: OAUTHBEARER  # SASL mechanism for SASLSSL listener
+      KAFKA_LISTENER_NAME_SASLSSL_OAUTHBEARER_SASL_SERVER_CALLBACK_HANDLER_CLASS: io.strimzi.kafka.oauth.server.JaasServerOauthValidatorCallbackHandler  # OAuth server callback handler
+      KAFKA_LISTENER_NAME_SASLSSL_OAUTHBEARER_SASL_LOGIN_CALLBACK_HANDLER_CLASS: io.strimzi.kafka.oauth.client.JaasClientOauthLoginCallbackHandler  # OAuth client login callback handler
+      KAFKA_LISTENER_NAME_SASLSSL_SSL_CLIENT_AUTH: none      # Client authentication setting for SASLSSL listener
+
+      # SASL/PLAINTEXT Listener Configuration
+      KAFKA_LISTENER_NAME_SASLPLAINTEXT_SASL_ENABLED_MECHANISMS: PLAIN  # SASL mechanism for SASLPLAINTEXT listener (unused here but defined)
+
+      # SSL Configuration
+      KAFKA_SSL_KEYSTORE_FILENAME: server.keystore.jks       # Keystore file for SSL
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: credentials            # Credentials file for keystore
+      KAFKA_SSL_KEY_CREDENTIALS: credentials                 # Key credentials file
+      KAFKA_SSL_TRUSTSTORE_FILENAME: server.truststore.jks   # Truststore file for SSL
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: credentials          # Credentials file for truststore
+      KAFKA_SSL_CLIENT_AUTH: required                        # Require SSL client authentication
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: " "       # Disable hostname verification (empty string)
+
+      # Authentication and Authorization
+      KAFKA_SASL_MECHANISM: OAUTHBEARER                      # Default SASL mechanism for authentication
+      KAFKA_AUTHORIZER_CLASS_NAME: io.strimzi.kafka.oauth.server.authorizer.KeycloakAuthorizer  # Authorizer class for access control
+      KAFKA_PRINCIPAL_BUILDER_CLASS: io.strimzi.kafka.oauth.server.OAuthKafkaPrincipalBuilder  # Custom principal builder for OAuth
+      KAFKA_SSL_PRINCIPAL_MAPPING_RULES: "RULE:^CN=(.*?)$$/$$1/L"  # Rule to map SSL certificate CN to principal
+      KAFKA_STRIMZI_AUTHORIZATION_TOKEN_ENDPOINT_URI: https://MyKeycloakServer.ch/auth/realms/master/protocol/openid-connect/token  # Token endpoint for authorization
+      KAFKA_STRIMZI_AUTHORIZATION_CLIENT_ID: kafka-broker    # Client ID for authorization
+      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "false"          # Deny access if no ACLs are found
+      KAFKA_SUPER_USERS: ${KAFKA_SUPER_USERS}                # List of super users with full privileges
+
+      # Logging Configuration
+      KAFKA_LOG4J_LOGGERS: "org.apache.kafka.common.security.oauthbearer=INFO,kafka.oauthbearer=INFO,kafka.authorizer.logger=INFO,kafka.controller=INFO,io.strimzi.kafka.oauth.server.authorizer=INFO,org.apache.kafka.common.security.ssl=DEBUG"  # Log levels for specific components
+      KAFKA_LOG4J_ROOT_LOGLEVEL: "INFO"                      # Root log level
+
+      # JVM Options
+      KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/secrets/conf/kafka_server_jaas.conf"  # JVM options for JAAS configuration
+    volumes:
+      - ./certs/server.keystore.jks:/etc/kafka/secrets/server.keystore.jks
+      - ./certs/server.truststore.jks:/etc/kafka/secrets/server.truststore.jks
+      - ./certs/credentials:/etc/kafka/secrets/credentials
+      - ./config/kafka_server_jaas.conf:/etc/kafka/secrets/conf/kafka_server_jaas.conf
+    networks:
+      - kafka
+
+  kafka-2:
+    image: eu.gcr.io/quickstart-1565428320969/kafka:latest
+    container_name: kafka-2
+    restart: always
+    depends_on:
+      - zookeeper-1
+      - zookeeper-2
+      - zookeeper-3
+    ports:
+     - 29092:29092
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181"
+      KAFKA_ZOOKEEPER_SASL_ENABLED: "true"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 100
+      KAFKA_LISTENERS: SASLSSL://0.0.0.0:29092,SSL://0.0.0.0:29093
+      KAFKA_ADVERTISED_LISTENERS: SASLSSL://kafka-2:29092,SSL://kafka-2:29093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: SASLSSL:SASL_SSL,SSL:SSL
+      KAFKA_INTER_BROKER_LISTENER_NAME: SSL
+      KAFKA_LISTENER_NAME_SASLSSL_OAUTHBEARER_SASL_SERVER_CALLBACK_HANDLER_CLASS: io.strimzi.kafka.oauth.server.JaasServerOauthValidatorCallbackHandler
+      KAFKA_LISTENER_NAME_SASLSSL_OAUTHBEARER_SASL_LOGIN_CALLBACK_HANDLER_CLASS: "io.strimzi.kafka.oauth.client.JaasClientOauthLoginCallbackHandler"
+      KAFKA_LISTENER_NAME_SASLSSL_SASL_ENABLED_MECHANISMS: OAUTHBEARER
+      KAFKA_LISTENER_NAME_SASLSSL_SSL_CLIENT_AUTH: none
+      KAFKA_LISTENER_NAME_SASLPLAINTEXT_SASL_ENABLED_MECHANISMS: PLAIN
+      KAFKA_SSL_KEYSTORE_FILENAME: server.keystore.jks
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: credentials
+      KAFKA_SSL_KEY_CREDENTIALS: credentials
+      KAFKA_SSL_TRUSTSTORE_FILENAME: server.truststore.jks
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: credentials
+      KAFKA_SSL_CLIENT_AUTH: required
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: " "
+      KAFKA_SASL_MECHANISM: OAUTHBEARER
+      KAFKA_AUTHORIZER_CLASS_NAME: io.strimzi.kafka.oauth.server.authorizer.KeycloakAuthorizer
+      KAFKA_PRINCIPAL_BUILDER_CLASS: io.strimzi.kafka.oauth.server.OAuthKafkaPrincipalBuilder
+      KAFKA_SSL_PRINCIPAL_MAPPING_RULES: "RULE:^CN=(.*?)$$/$$1/L"
+      KAFKA_STRIMZI_AUTHORIZATION_TOKEN_ENDPOINT_URI: https://MyKeycloakServer.ch/auth/realms/master/protocol/openid-connect/token
+      KAFKA_STRIMZI_AUTHORIZATION_CLIENT_ID: kafka-broker
+      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "false"
+      KAFKA_SUPER_USERS: ${KAFKA_SUPER_USERS}
+      KAFKA_LOG4J_LOGGERS: "org.apache.kafka.common.security.oauthbearer=DEBUG,kafka.oauthbearer=DEBUG,kafka.authorizer.logger=INFO,kafka.controller=INFO"
+      KAFKA_LOG4J_ROOT_LOGLEVEL: "DEBUG"
+      KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/secrets/conf/kafka_server_jaas.conf"
+    volumes:
+      - ./certs:/etc/kafka/secrets
+      - ./config/kafka_server_jaas.conf:/etc/kafka/secrets/conf/kafka_server_jaas.conf
+    networks:
+      - kafka
+
+  kafka-3:
+    image: eu.gcr.io/quickstart-1565428320969/kafka:latest
+    container_name: kafka-3
+    restart: always
+    depends_on:
+      - zookeeper-1
+      - zookeeper-2
+      - zookeeper-3
+    ports:
+     - 39092:39092
+    environment:
+      # Broker Identification and Core Settings
+      KAFKA_BROKER_ID: 3                                      # Unique identifier for this Kafka broker
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181"  # Zookeeper ensemble connection string
+      KAFKA_ZOOKEEPER_SASL_ENABLED: "true"                   # Enable SASL for Zookeeper connection
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"                # Automatically create topics if they don’t exist
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3              # Replication factor for offsets topic
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2                 # Minimum in-sync replicas for transaction state log
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3      # Replication factor for transaction state log
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 100            # Delay before initial consumer group rebalance
+
+      # Listener Configuration
+      KAFKA_LISTENERS: SASLSSL://0.0.0.0:39092,SSL://0.0.0.0:39093  # Define listener endpoints
+      KAFKA_ADVERTISED_LISTENERS: SASLSSL://kafka-3:39092,SSL://kafka-3:39093  # Advertised listener endpoints for clients
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: SASLSSL:SASL_SSL,SSL:SSL  # Mapping of listener names to security protocols
+      KAFKA_INTER_BROKER_LISTENER_NAME: SSL                  # Listener used for inter-broker communication
+
+      # SASL/SSL Listener Configuration (SASLSSL)
+      KAFKA_LISTENER_NAME_SASLSSL_SASL_ENABLED_MECHANISMS: OAUTHBEARER  # SASL mechanism for SASLSSL listener
+      KAFKA_LISTENER_NAME_SASLSSL_OAUTHBEARER_SASL_SERVER_CALLBACK_HANDLER_CLASS: io.strimzi.kafka.oauth.server.JaasServerOauthValidatorCallbackHandler  # OAuth server callback handler
+      KAFKA_LISTENER_NAME_SASLSSL_OAUTHBEARER_SASL_LOGIN_CALLBACK_HANDLER_CLASS: io.strimzi.kafka.oauth.client.JaasClientOauthLoginCallbackHandler  # OAuth client login callback handler
+      KAFKA_LISTENER_NAME_SASLSSL_SSL_CLIENT_AUTH: none      # Client authentication setting for SASLSSL listener
+
+      # SASL/PLAINTEXT Listener Configuration
+      KAFKA_LISTENER_NAME_SASLPLAINTEXT_SASL_ENABLED_MECHANISMS: PLAIN  # SASL mechanism for SASLPLAINTEXT listener
+
+      # SSL Configuration
+      KAFKA_SSL_KEYSTORE_FILENAME: server.keystore.jks       # Keystore file for SSL
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: credentials            # Credentials file for keystore
+      KAFKA_SSL_KEY_CREDENTIALS: credentials                 # Key credentials file
+      KAFKA_SSL_TRUSTSTORE_FILENAME: server.truststore.jks   # Truststore file for SSL
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: credentials          # Credentials file for truststore
+      KAFKA_SSL_CLIENT_AUTH: required                        # Require SSL client authentication
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: " "       # Disable hostname verification (empty string)
+
+      # Authentication and Authorization
+      KAFKA_SASL_MECHANISM: OAUTHBEARER                      # Default SASL mechanism for authentication
+      KAFKA_AUTHORIZER_CLASS_NAME: io.strimzi.kafka.oauth.server.authorizer.KeycloakAuthorizer  # Authorizer class for access control
+      KAFKA_PRINCIPAL_BUILDER_CLASS: io.strimzi.kafka.oauth.server.OAuthKafkaPrincipalBuilder  # Custom principal builder for OAuth
+      KAFKA_SSL_PRINCIPAL_MAPPING_RULES: "RULE:^CN=(.*?)$$/$$1/L"  # Rule to map SSL certificate CN to principal
+      KAFKA_STRIMZI_AUTHORIZATION_TOKEN_ENDPOINT_URI: https://MyKeycloakServer.ch/auth/realms/master/protocol/openid-connect/token  # Token endpoint for authorization
+      KAFKA_STRIMZI_AUTHORIZATION_CLIENT_ID: kafka-broker    # Client ID for authorization
+      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "false"          # Deny access if no ACLs are found
+      KAFKA_SUPER_USERS: ${KAFKA_SUPER_USERS}                # List of super users with full privileges
+
+      # Logging Configuration
+      KAFKA_LOG4J_LOGGERS: "org.apache.kafka.common.security.oauthbearer=DEBUG,kafka.oauthbearer=DEBUG,kafka.authorizer.logger=INFO,kafka.controller=INFO"  # Log levels for specific components
+      KAFKA_LOG4J_ROOT_LOGLEVEL: "DEBUG"                     # Root log level
+
+      # JVM Options
+      KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/secrets/conf/kafka_server_jaas.conf"  # JVM options for JAAS configuration
+    volumes:
+      - ./certs:/etc/kafka/secrets
+      - ./config/kafka_server_jaas.conf:/etc/kafka/secrets/conf/kafka_server_jaas.conf
+    networks:
+      - kafka
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui
+    container_name: kafka-ui
+    restart: always
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+    ports:
+      - "8089:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-1:19093,kafka-2:29093,kafka-3:39093
+      KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL: SSL
+      KAFKA_CLUSTERS_0_PROPERTIES_SSL_TRUSTSTORE_LOCATION: /etc/kafka/certs/server.truststore.jks
+      KAFKA_CLUSTERS_0_PROPERTIES_SSL_TRUSTSTORE_PASSWORD: keystorepw
+      KAFKA_CLUSTERS_0_PROPERTIES_SSL_KEYSTORE_LOCATION: /etc/kafka/certs/kafka-ui.keystore.jks
+      KAFKA_CLUSTERS_0_PROPERTIES_SSL_KEYSTORE_PASSWORD: keystorepw
+      KAFKA_CLUSTERS_0_PROPERTIES_CLIENT_DNS_LOOKUP: use_all_dns_ips
+    volumes:
+      - ./certs:/etc/kafka/certs
+      - ./config/kafka_ui_jaas.conf:/etc/kafka/secrets/kafka_ui_jaas.conf
+    networks:
+      - kafka
+
+networks:
+  kafka:
+    name: kafka
+    driver: bridge
