@@ -12,9 +12,15 @@ export default function KafkaTestApp() {
     const [brokers, setBrokers] = useState("kafka:9092");
     const [socket, setSocket] = useState(null);
     const [authType, setAuthType] = useState("none");
+    const [tokenEndpointUrl, setTokenEndpointUrl] = useState("");
+    const [clientId, setClientId] = useState("");
+    const [clientSecret, setClientSecret] = useState("");
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [wsConnected, setWsConnected] = useState(false);
+    const [ca, setCa] = useState(null);
+    const [clientCert, setClientCert] = useState(null);
+    const [clientKey, setClientKey] = useState(null);
 
     const logMessage = (msg) => {
         setLogs((prev) => prev + msg + "\n");
@@ -22,10 +28,42 @@ export default function KafkaTestApp() {
 
     const sendMessage = async () => {
         try {
+            const body = {
+                action: "send",
+                message,
+                brokers,
+                authType,
+                username,
+                password,
+                tokenEndpointUrl,
+                clientId,
+                clientSecret
+            };
+
+            if (authType === "ssl" || authType === "oauthbearer") {
+                let caData = null;
+                let clientCertData = null;
+                let clientKeyData = null;
+
+                if (ca) {
+                    caData = await readFileAsDataURL(ca);
+                }
+                if (clientCert) {
+                    clientCertData = await readFileAsDataURL(clientCert);
+                }
+                if (clientKey) {
+                    clientKeyData = await readFileAsDataURL(clientKey);
+                }
+
+                body.ca = caData;
+                body.clientCert = clientCertData;
+                body.clientKey = clientKeyData;
+            }
+
             const response = await fetch("/api/kafka", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "send", message, brokers, authType, username, password }),
+                body: JSON.stringify(body),
             });
             const data = await response.json();
             logMessage(data.success ? `📤 Sent: ${message}` : `❌ Error: ${data.error}`);
@@ -34,11 +72,46 @@ export default function KafkaTestApp() {
         }
     };
 
-    const saveSettings = () => {
+    const saveSettings = async () => {
         if (socket) {
-            socket.emit("setBrokers", { brokers, authType, username, password });
+            let caData = null;
+            let clientCertData = null;
+            let clientKeyData = null;
+
+            if (ca) {
+                caData = await readFileAsDataURL(ca);
+            }
+            if (clientCert) {
+                clientCertData = await readFileAsDataURL(clientCert);
+            }
+            if (clientKey) {
+                clientKeyData = await readFileAsDataURL(clientKey);
+            }
+
+            socket.emit("setBrokers", {
+                brokers,
+                authType,
+                username,
+                password,
+                ca: caData,
+                clientCert: clientCertData,
+                clientKey: clientKeyData,
+                tokenEndpointUrl,
+                clientId,
+                clientSecret
+            });
             logMessage(`🔄 Updated settings: Brokers - ${brokers}, Auth - ${authType}`);
         }
+    };
+
+    // Helper function to read file as data URL
+    const readFileAsDataURL = (file) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
     };
 
     const saveBrokers = () => {
@@ -148,7 +221,55 @@ export default function KafkaTestApp() {
                             <select className="form-control" value={authType} onChange={(e) => setAuthType(e.target.value)}>
                                 <option value="none">None</option>
                                 <option value="sasl_plaintext">SASL/PLAIN</option>
+                                <option value="ssl">SSL</option>
+                                <option value="oauthbearer">OAUTHBEARER</option>
                             </select>
+                            {authType === "oauthbearer" && (
+                                <>
+                                    <label htmlFor="caFile">CA Certificate:</label>
+                                    <Input
+                                        id="caFile"
+                                        type="file"
+                                        accept=".pem"
+                                        onChange={(e) => setCa(e.target.files[0])}
+                                        placeholder="Upload CA Certificate (ca.pem)"
+                                    />
+                                    <label htmlFor="clientCertFile">Client Certificate:</label>
+                                    <Input
+                                        id="clientCertFile"
+                                        type="file"
+                                        accept=".pem"
+                                        onChange={(e) => setClientCert(e.target.files[0])}
+                                        placeholder="Upload Client Certificate (client.pem)"
+                                    />
+                                    <label htmlFor="clientKeyFile">Client Key:</label>
+                                    <Input
+                                        id="clientKeyFile"
+                                        type="file"
+                                        accept=".key"
+                                        onChange={(e) => setClientKey(e.target.files[0])}
+                                        placeholder="Upload Client Key (client.key)"
+                                    />
+                                    <Input
+                                        type="text"
+                                        placeholder="Token Endpoint URL"
+                                        value={tokenEndpointUrl}
+                                        onChange={(e) => setTokenEndpointUrl(e.target.value)}
+                                    />
+                                    <Input
+                                        type="text"
+                                        placeholder="Client ID"
+                                        value={clientId}
+                                        onChange={(e) => setClientId(e.target.value)}
+                                    />
+                                    <Input
+                                        type="password"
+                                        placeholder="Client Secret"
+                                        value={clientSecret}
+                                        onChange={(e) => setClientSecret(e.target.value)}
+                                    />
+                                </>
+                            )}
                             {authType === "sasl_plaintext" && (
                                 <>
                                     <Input
@@ -162,6 +283,34 @@ export default function KafkaTestApp() {
                                         placeholder="Password"
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
+                                    />
+                                </>
+                            )}
+                            {authType === "ssl" && (
+                                <>
+                                    <label htmlFor="caFile">CA Certificate:</label>
+                                    <Input
+                                        id="caFile"
+                                        type="file"
+                                        accept=".pem"
+                                        onChange={(e) => setCa(e.target.files[0])}
+                                        placeholder="Upload CA Certificate (ca.pem)"
+                                    />
+                                    <label htmlFor="clientCertFile">Client Certificate:</label>
+                                    <Input
+                                        id="clientCertFile"
+                                        type="file"
+                                        accept=".pem"
+                                        onChange={(e) => setClientCert(e.target.files[0])}
+                                        placeholder="Upload Client Certificate (client.pem)"
+                                    />
+                                    <label htmlFor="clientKeyFile">Client Key:</label>
+                                    <Input
+                                        id="clientKeyFile"
+                                        type="file"
+                                        accept=".key"
+                                        onChange={(e) => setClientKey(e.target.files[0])}
+                                        placeholder="Upload Client Key (client.key)"
                                     />
                                 </>
                             )}
