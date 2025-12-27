@@ -21,6 +21,11 @@ export default function KafkaTestApp() {
     const [ca, setCa] = useState(null);
     const [clientCert, setClientCert] = useState(null);
     const [clientKey, setClientKey] = useState(null);
+    const [replicationStats, setReplicationStats] = useState(null);
+    const [loadingReplication, setLoadingReplication] = useState(false);
+    const [producerActive, setProducerActive] = useState(false);
+    const [producerInterval, setProducerInterval] = useState(2000);
+    const [sessionId] = useState(() => `session-${Date.now()}-${Math.random().toString(36).substring(7)}`);
 
     const logMessage = (msg) => {
         setLogs((prev) => prev + msg + "\n");
@@ -121,6 +126,134 @@ export default function KafkaTestApp() {
         }
     };
 
+    const getReplicationStats = async () => {
+        setLoadingReplication(true);
+        try {
+            let caData = null;
+            let clientCertData = null;
+            let clientKeyData = null;
+
+            if (ca) {
+                caData = await readFileAsDataURL(ca);
+            }
+            if (clientCert) {
+                clientCertData = await readFileAsDataURL(clientCert);
+            }
+            if (clientKey) {
+                clientKeyData = await readFileAsDataURL(clientKey);
+            }
+
+            const response = await fetch("/api/kafka-admin", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action: "getTopicMetadata",
+                    brokers,
+                    authType,
+                    username,
+                    password,
+                    ca: caData,
+                    clientCert: clientCertData,
+                    clientKey: clientKeyData,
+                    tokenEndpointUrl,
+                    clientId,
+                    clientSecret,
+                    topic: "test-topic",
+                }),
+            });
+            const data = await response.json();
+            if (response.ok) {
+                setReplicationStats(data);
+                logMessage(`✅ Replication stats retrieved for topic: ${data.topic}`);
+            } else {
+                logMessage(`❌ Error getting replication stats: ${data.error}`);
+            }
+        } catch (error) {
+            logMessage(`❌ Error getting replication stats: ${error.message}`);
+        } finally {
+            setLoadingReplication(false);
+        }
+    };
+
+    const startProducer = async () => {
+        try {
+            let caData = null;
+            let clientCertData = null;
+            let clientKeyData = null;
+
+            if (ca) {
+                caData = await readFileAsDataURL(ca);
+            }
+            if (clientCert) {
+                clientCertData = await readFileAsDataURL(clientCert);
+            }
+            if (clientKey) {
+                clientKeyData = await readFileAsDataURL(clientKey);
+            }
+
+            const body = {
+                action: "start",
+                sessionId,
+                brokers,
+                authType,
+                interval: producerInterval,
+                username,
+                password,
+                tokenEndpointUrl,
+                clientId,
+                clientSecret,
+            };
+
+            if (authType === "ssl" || authType === "oauthbearer") {
+                body.ca = caData;
+                body.clientCert = clientCertData;
+                body.clientKey = clientKeyData;
+            }
+
+            console.log("▶️ Starting producer with sessionId:", sessionId);
+            const response = await fetch("/api/kafka-producer", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            });
+            const data = await response.json();
+            console.log("▶️ Start response:", data);
+            if (response.ok && data.success) {
+                setProducerActive(true);
+                logMessage(`✅ Producer started (interval: ${producerInterval}ms, sessionId: ${sessionId})`);
+            } else {
+                logMessage(`❌ Error starting producer: ${data.error}`);
+            }
+        } catch (error) {
+            logMessage(`❌ Error starting producer: ${error.message}`);
+        }
+    };
+
+    const stopProducer = async () => {
+        try {
+            console.log("🛑 Stopping producer with sessionId:", sessionId);
+            const response = await fetch("/api/kafka-producer", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action: "stop",
+                    sessionId,
+                }),
+            });
+            const data = await response.json();
+            console.log("🛑 Stop response:", data);
+            if (response.ok && data.success) {
+                setProducerActive(false);
+                logMessage(`🛑 Producer stopped`);
+            } else {
+                logMessage(`❌ Error stopping producer: ${data.error || "Unknown error"}`);
+            }
+        } catch (error) {
+            console.error("❌ Stop producer error:", error);
+            logMessage(`❌ Error stopping producer: ${error.message}`);
+        }
+    };
+
     useEffect(() => {
 
         const newSocket = io({
@@ -160,6 +293,7 @@ export default function KafkaTestApp() {
             newSocket.disconnect();
         };
     }, []);
+
 
     useEffect(() => {
         // Ensure the WebSocket API route initializes
@@ -324,6 +458,7 @@ export default function KafkaTestApp() {
                 <div className="col-md-6">
                     <Card>
                         <CardContent className="p-4 d-flex flex-column gap-2">
+                            <h5>📤 Send Message</h5>
                             <Input
                                 type="text"
                                 placeholder="Enter message"
@@ -331,6 +466,32 @@ export default function KafkaTestApp() {
                                 onChange={(e) => setMessage(e.target.value)}
                             />
                             <Button onClick={sendMessage} className="btn btn-primary">Send Message</Button>
+                        </CardContent>
+                    </Card>
+                </div>
+                <div className="col-md-6">
+                    <Card>
+                        <CardContent className="p-4 d-flex flex-column gap-2">
+                            <h5>🔄 Auto Producer</h5>
+                            <p className="text-muted small">Produces random animal names with random keys to distribute across partitions</p>
+                            <div className="d-flex gap-2 align-items-center">
+                                <label className="small">Interval (ms):</label>
+                                <Input
+                                    type="number"
+                                    value={producerInterval}
+                                    onChange={(e) => setProducerInterval(parseInt(e.target.value) || 2000)}
+                                    disabled={producerActive}
+                                    style={{ width: "100px" }}
+                                />
+                            </div>
+                            {producerActive ? (
+                                <Button onClick={stopProducer} className="btn btn-danger">Stop Producer</Button>
+                            ) : (
+                                <Button onClick={startProducer} className="btn btn-success">Start Producer</Button>
+                            )}
+                            <p className="text-muted small">
+                                {producerActive ? "🟢 Producer is running" : "⚪ Producer is stopped"}
+                            </p>
                         </CardContent>
                     </Card>
                 </div>
@@ -347,6 +508,79 @@ export default function KafkaTestApp() {
                     </Card>
                 </div>
             </div>
+            <div className="row mt-3">
+                <div className="col-12">
+                    <Card>
+                        <CardContent className="p-4">
+                            <h5>📊 Topic Replication Stats</h5>
+                            <div className="d-flex gap-2 mb-3">
+                                <Button 
+                                    onClick={getReplicationStats} 
+                                    disabled={loadingReplication}
+                                    className="btn-sm btn-primary"
+                                >
+                                    {loadingReplication ? "Loading..." : "Get Replication Stats (test-topic)"}
+                                </Button>
+                            </div>
+                            
+                            {replicationStats && (
+                                <div className="mt-3">
+                                    <div className="alert alert-info">
+                                        <strong>Topic:</strong> {replicationStats.topic}<br/>
+                                        <strong>Partitions:</strong> {replicationStats.partitionCount}<br/>
+                                        <strong>Replication Factor:</strong> {replicationStats.replicationFactor}<br/>
+                                        <strong>Partitions with Full Replication:</strong> {replicationStats.summary.partitionsWithFullReplication} / {replicationStats.summary.totalPartitions}<br/>
+                                        <strong>Partitions with All ISR:</strong> {replicationStats.summary.partitionsWithAllISR} / {replicationStats.summary.totalPartitions}<br/>
+                                        <strong>Partitions with Offline Replicas:</strong> {replicationStats.summary.partitionsWithOfflineReplicas}<br/>
+                                        <strong>ISR Range:</strong> {replicationStats.summary.minISR} - {replicationStats.summary.maxISR} (min - max)
+                                    </div>
+                                    
+                                    <div className="mt-3">
+                                        <h6>Partition Details:</h6>
+                                        <div className="table-responsive">
+                                            <table className="table table-sm table-bordered">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Partition</th>
+                                                        <th>Leader</th>
+                                                        <th>Replicas</th>
+                                                        <th>ISR</th>
+                                                        <th>Offline</th>
+                                                        <th>Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {replicationStats.partitions.map((p) => (
+                                                        <tr key={p.partitionId} className={
+                                                            p.isr.length === p.replicas.length && p.offlineReplicas.length === 0 
+                                                                ? "table-success" 
+                                                                : "table-warning"
+                                                        }>
+                                                            <td>{p.partitionId}</td>
+                                                            <td>{p.leader}</td>
+                                                            <td>{p.replicas.join(", ")}</td>
+                                                            <td>{p.isr.join(", ")}</td>
+                                                            <td>{p.offlineReplicas.length > 0 ? p.offlineReplicas.join(", ") : "None"}</td>
+                                                            <td>
+                                                                {p.isr.length === p.replicas.length && p.offlineReplicas.length === 0 ? (
+                                                                    <span className="badge bg-success">✓ Healthy</span>
+                                                                ) : (
+                                                                    <span className="badge bg-warning">⚠ Degraded</span>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+
             <div className="row mt-3">
                 <div className="col-12">
                     <Card>
