@@ -1,0 +1,43 @@
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaRebalance
+metadata:
+  name: kafka-cluster-rebalance
+  namespace: kafka
+  labels:
+    app: {{ include "opensight-strimzi-deployment.fullname" . }}
+    chart: {{ include "opensight-strimzi-deployment.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+    # Reference to the Kafka cluster (required - used by Strimzi to identify the cluster)
+    strimzi.io/cluster: kafka-cluster
+spec:
+  # Rebalance mode: "full" (full rebalance), "add-brokers" (add new brokers only), or "remove-brokers"
+  # Use "add-brokers" when scaling up to move partitions to new brokers only
+  mode: "full"
+  
+  # List of broker IDs to add (only used when mode is "add-brokers")
+  # brokers: [3, 4]
+  
+  # Goals for the rebalance (optional, uses Cruise Control defaults if not specified)
+  # goals:
+  #   - RackAwareGoal
+  #   - ReplicaCapacityGoal
+  #   - ReplicaDistributionGoal
+  #   - BrokerCapacityGoal
+  #   - TopicReplicaDistributionGoal
+  #   - LeaderReplicaDistributionGoal
+  #   - LeaderBytesInDistributionGoal
+  #   - PreferredLeaderElectionGoal
+  
+  # Concurrent partition movements per broker (optional, default: 5)
+  # concurrentPartitionMovementsPerBroker: 5
+  
+  # Concurrent leader movements (optional, default: 1000)
+  # concurrentLeaderMovements: 1000
+  
+  # Concurrent intra-broker partition movements (optional, default: 2)
+  # concurrentIntraBrokerPartitionMovements: 2
+  
+  # Exclude topics from rebalance (optional, regex pattern)
+  # excludedTopics: "^__.*"
+

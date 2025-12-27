@@ -1,0 +1,279 @@
+# Default values for opensight-strimzi-deployment
+# This is a YAML-formatted file.
+
+# Kafka Cluster Configuration
+kafka:
+  enabled: true
+  version: "4.1.0"
+  replicas: 3
+  storage:
+    size: "10Gi"
+    type: "persistent-claim"
+    deleteClaim: false
+
+  # Pod anti-affinity configuration
+  # Ensures Kafka brokers are spread across different nodes for high availability
+  affinity:
+    enabled: true
+    # If true, uses requiredDuringSchedulingIgnoredDuringExecution (hard requirement)
+    # If false, uses preferredDuringSchedulingIgnoredDuringExecution (soft preference)
+    # Required: Ensures brokers are never on the same node (may prevent scheduling if not enough nodes)
+    # Preferred: Tries to spread brokers but allows scheduling if needed
+    required: false
+
+  # KRaft mode configuration
+  kraft:
+    enabled: true
+    nodeId: "0"
+    processRoles: "broker,controller"
+    controllerQuorumVoters: "0@kafka-cluster-kafka-0.kafka-cluster-kafka-brokers.kafka.svc.cluster.local:9093"
+    controllerListenerNames: "controller"
+
+  # Listeners configuration
+  listeners:
+    controller:
+      port: 9093
+      type: "internal"
+      tls: false
+    plain:
+      port: 9092
+      type: "internal"
+      tls: false
+    external:
+      enabled: true
+      port: 9094
+      type: "loadbalancer"
+      tls: true
+      # Require client certificates (mutual TLS) even when using OAuth
+      # When true, clients must present a valid certificate in addition to OAuth token
+      requireClientCert: true
+      # Authentication type: "tls" for mutual TLS only, "oauth" for OAuth bearer tokens with mutual TLS
+      # When "oauth", clients must present both a valid certificate (mutual TLS) AND an OAuth bearer token
+      authentication:
+        type: "oauth"  # Options: "tls" or "oauth"
+      # Bootstrap LoadBalancer IP (for initial client connection and metadata discovery)
+      bootstrapLoadBalancerIP: ""
+      # Per-broker LoadBalancer IPs (one per broker for direct connections)
+      # If empty, Strimzi will create separate LoadBalancer services automatically
+      brokerLoadBalancerIPs: []
+      externalTrafficPolicy: "Local"
+
+  # Kafka configuration
+  config:
+    offsetsTopicReplicationFactor: 3
+    transactionStateLogReplicationFactor: 3
+    transactionStateLogMinIsr: 2
+    defaultReplicationFactor: 3
+    minInsyncReplicas: 2
+    interBrokerProtocolVersion: "3.6"
+    logMessageFormatVersion: "3.6"
+    # Enable authorization for KRaft mode
+    # StandardAuthorizer is required for simple authorization ACLs
+    # KeycloakAuthorizer is required for OAuth-based authorization
+    # When OAuth is enabled, this will be overridden to use KeycloakAuthorizer
+    authorizerClassName: "org.apache.kafka.metadata.authorizer.StandardAuthorizer"
+
+  # External access configuration
+  external:
+    # DNS name for bootstrap (e.g., kafka-bootstrap.example.com)
+    bootstrapDns: ""
+    # DNS names for individual brokers (e.g., kafka-0.example.com, kafka-1.example.com, kafka-2.example.com)
+    # If empty, will use broker index (kafka-0, kafka-1, kafka-2)
+    brokerDns: []
+
+  # OAuth configuration for authentication and authorization
+  oauth:
+    enabled: true
+    # OAuth token endpoint URL
+    tokenEndpointUri: "https://auth.opensight.ch/auth/realms/master/protocol/openid-connect/token"
+    # OAuth client ID for Kafka broker
+    clientId: "kafka-broker"
+    # OAuth client secret name in Kubernetes
+    # The secret must be created manually before deploying (see README)
+    clientSecretName: "kafka-oauth-client-secret"
+    # OAuth client secret key in Kubernetes secret
+    clientSecretKey: "client-secret"
+    # Valid issuer URI for token validation
+    validIssuerUri: "https://auth.opensight.ch/auth/realms/master"
+    # JWKS endpoint URI for token validation
+    jwksEndpointUri: "https://auth.opensight.ch/auth/realms/master/protocol/openid-connect/certs"
+    # OAuth token scope
+    scope: "openid profile email"
+    # Username claim in JWT token
+    usernameClaim: "preferred_username"
+    # Fallback username claim if preferred_username is not present
+    fallbackUsernameClaim: "sub"
+    # Fallback username prefix if username claim is not present
+    fallbackUsernamePrefix: ""
+    # Enable audience check
+    checkAudience: true
+    # Custom audience claim
+    customClaimCheck: ""
+    # Maximum token expiry seconds
+    maxSecondsWithoutReauthentication: 3600
+    # Enable access token is JWT
+    accessTokenIsJwt: true
+    # Enable ECDSA signature algorithm
+    enableECDSA: true
+    # Enable OAuth metrics
+    enableMetrics: true
+    # Allow everyone if no ACL found (for KeycloakAuthorizer)
+    # When false, denies access if no ACLs are found (secure default)
+    # When true, allows access if no ACLs are found (less secure)
+    allowEveryoneIfNoAclFound: false
+
+# Entity Operator Configuration
+entityOperator:
+  topicOperator:
+    enabled: true
+  userOperator:
+    enabled: true
+
+# Cruise Control Configuration
+cruiseControl:
+  enabled: true
+  replicas: 1
+  # Cruise Control image (optional, uses Strimzi default if not specified)
+  image: ""
+  # Cruise Control configuration properties
+  config:
+    # Number of concurrent partition movements per broker
+    num.concurrent.partition.movements.per.broker: "5"
+    # Maximum number of concurrent partition movements in cluster
+    max.num.cluster.movements: "10"
+    # Number of threads for broker metric sampling
+    num.proposal.precompute.threads: "4"
+    # Enable self-healing for dead brokers
+    self.healing.enabled: "true"
+    # Enable self-healing for removed brokers
+    self.healing.broker.failure.enabled: "true"
+    # Enable self-healing for goal violations
+    self.healing.goal.violation.enabled: "true"
+    # Enable self-healing for disk failures
+    self.healing.disk.failure.enabled: "true"
+    # Anomaly detection interval in milliseconds
+    anomaly.detection.interval.ms: "300000"
+    # Metrics window number
+    metrics.window.ms: "300000"
+    # Number of windows to keep
+    num.metrics.windows: "20"
+    # Sample loading check interval in milliseconds
+    sample.loading.check.interval.ms: "5000"
+    # Enable topic config optimization
+    topic.config.provider.class: "com.linkedin.kafka.cruisecontrol.config.BrokerSetAwareTopicConfigProvider"
+  # TLS configuration (optional)
+  tls: {}
+  # Metrics configuration (optional)
+  metrics: {}
+  # Pod template configuration (optional)
+  template:
+    pod:
+      metadata: {}
+      affinity: {}
+
+# Kafka Topic Configuration
+kafkaTopic:
+  enabled: true
+  name: "test-topic"
+  partitions: 3
+  replicas: 3
+  config:
+    retentionMs: 7200000
+    segmentBytes: 1073741824
+
+# Kafka User Configuration
+kafkaUser:
+  enabled: true
+  name: "kafka-user"
+  # Authentication type: "scram-sha-512" or "tls"
+  # Use "tls" for client certificate authentication (mutual TLS)
+  authentication:
+    type: "tls"  # Options: "scram-sha-512" or "tls"
+  authorization:
+    type: "simple"
+    acls:
+      - resource:
+          type: "topic"
+          name: "*"
+          patternType: "literal"
+        operations:
+          - All
+      - resource:
+          type: "group"
+          name: "*"
+          patternType: "literal"
+        operations:
+          - All
+
+# Kafka Connect Configuration
+kafkaConnect:
+  enabled: false
+  version: "4.1.0"
+  replicas: 1
+  config:
+    groupId: "connect-cluster"
+    offsetStorageTopic: "connect-offsets"
+    configStorageTopic: "connect-configs"
+    statusStorageTopic: "connect-status"
+    configStorageReplicationFactor: 3
+    offsetStorageReplicationFactor: 3
+    statusStorageReplicationFactor: 3
+    keyConverter: "org.apache.kafka.connect.storage.StringConverter"
+    valueConverter: "org.apache.kafka.connect.storage.StringConverter"
+    keyConverterSchemasEnable: false
+    valueConverterSchemasEnable: false
+
+# Namespace Configuration
+namespace:
+  name: "kafka"
+  create: true
+
+# Strimzi Operator Configuration
+strimziOperator:
+  enabled: true
+  version: "0.48.0"
+  namespace: "kafka"
+  createNamespace: true
+
+# Values passed to the strimzi-kafka-operator dependency chart
+strimzi-kafka-operator:
+  watchAnyNamespace: true
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+# Load Balancer Configuration
+loadBalancer:
+  enabled: true
+  externalTrafficPolicy: "Local"
+
+# Resource Configuration
+resources:
+  kafka:
+    requests:
+      memory: "64Mi"
+      cpu: "100m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+  zookeeper:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "200m"
+
+  cruiseControl:
+    requests:
+      memory: "512Mi"
+      cpu: "200m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+

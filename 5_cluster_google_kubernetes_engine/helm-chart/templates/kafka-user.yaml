@@ -1,0 +1,16 @@
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaUser
+metadata:
+  name: kafka-user
+  namespace: kafka
+  labels:
+    app: {{ include "opensight-strimzi-deployment.fullname" . }}
+    chart: {{ include "opensight-strimzi-deployment.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+    strimzi.io/cluster: kafka-cluster
+spec:
+  authentication:
+    type: "tls"
+  # Authorization is not included when OAuth is enabled
+  # When OAuth is enabled, authorization is handled by Keycloak, not KafkaUser ACLs

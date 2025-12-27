@@ -1,0 +1,39 @@
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaNodePool
+metadata:
+  name: kafka-cluster-nodepool
+  namespace: kafka
+  labels:
+    app: {{ include "opensight-strimzi-deployment.fullname" . }}
+    chart: {{ include "opensight-strimzi-deployment.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+    strimzi.io/cluster: kafka-cluster
+spec:
+  replicas: 3
+  roles:
+    - broker
+    - controller
+  storage:
+    type: "persistent-claim"
+    size: "10Gi"
+    deleteClaim: false
+  resources:
+    limits:
+      cpu: 500m
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 64Mi
+  template:
+    pod:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    strimzi.io/cluster: kafka-cluster
+                    strimzi.io/kind: Kafka
+                topologyKey: "kubernetes.io/hostname"

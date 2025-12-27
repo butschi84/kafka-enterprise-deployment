@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kafka
+  labels:
+    app: {{ include "opensight-strimzi-deployment.fullname" . }}
+    chart: {{ include "opensight-strimzi-deployment.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
